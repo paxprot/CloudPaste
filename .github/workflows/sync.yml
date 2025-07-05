@@ -15,11 +15,11 @@ jobs:
     if: ${{ github.event.repository.fork }}
 
     steps:
-      # Step 1: Checkout fork repo
+      # Checkout fork repo
       - name: Checkout target repo
         uses: actions/checkout@v4
 
-      # Step 2: Run the sync action
+      # Run the sync action
       - name: Sync upstream changes
         id: sync
         uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
@@ -30,8 +30,24 @@ jobs:
           target_sync_branch: main
           target_repo_token: ${{ secrets.GITHUB_TOKEN }}
           test_mode: false
+          
+      # Telegram notify on successful sync with new commits
+      - name: Telegram notify - Sync success with updates
+        if: steps.sync.outputs.has_new_commits == 'true'
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+          -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+          -d text="✅ [Upstream Sync]\nRepo: ${{ github.repository }}\nBranch: main\n✔️ Sync successful.\nNew commits were pulled from upstream."
 
-      # Step 3: Check sync result
+      # Telegram notify if sync step failed
+      - name: Telegram notify - Sync failure
+        if: steps.sync.outcome == 'failure'
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+          -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+          -d text="❌ [Upstream Sync FAILED]\nRepo: ${{ github.repository }}\nBranch: main\n⚠️ The sync process failed. This might be due to upstream workflow changes or other errors. Please check and sync manually."
+
+      # Check sync result
       - name: Sync check
         if: steps.sync.outcome == 'failure'
         run: |
